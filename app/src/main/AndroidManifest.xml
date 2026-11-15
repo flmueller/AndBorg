@@ -19,7 +19,7 @@
     </queries>
 
     <application
-        android:name=".AndBorglication"
+        android:name=".BorgApplication"
         android:allowBackup="false"
         android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
