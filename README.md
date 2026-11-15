@@ -64,7 +64,7 @@ Bauen: `./gradlew assembleDebug` (AGP 9.4, compileSdk 37, minSdk 29, targetSdk 3
 
 ## Lizenzen
 
-Die mitgelieferte Fremdsoftware und ihre Lizenzen stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Der Code von AndBorg steht unter der [MIT-Lizenz](LICENSE). Die mitgelieferte Fremdsoftware (borg, Python, OpenSSH …) behält ihre eigenen Lizenzen, siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Grenzen
 
