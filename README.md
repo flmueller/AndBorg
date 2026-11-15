@@ -62,6 +62,26 @@ Paketname: `de.flokke.borgapp` (aus der Entwicklungszeit beibehalten, damit best
 
 Bauen: `./gradlew assembleDebug` (AGP 9.4, compileSdk 37, minSdk 29, targetSdk 36).
 
+## Am PC wiederherstellen
+
+borg speichert Besitzer und Rechte so, wie Android sie meldet: Benutzer ist die App-ID auf dem Handy (z. B. `10354`),
+Gruppe ist `media_rw` (`1023`), Rechte `drwxrws---`. Am PC gibt es diesen Benutzer nicht, beim Einhängen ist
+der Zugriff daher zunächst verweigert. So geht es trotzdem:
+
+```
+# Einhängen, alle Dateien gehören dabei dem aktuellen Benutzer
+borg mount -o uid=$(id -u),gid=$(id -g) REPO::ARCHIV /mnt/temp
+
+# alternativ: Rechte beim Einhängen gar nicht prüfen
+borg mount -o ignore_permissions REPO::ARCHIV /mnt/temp
+
+# Wiederherstellen als normaler Benutzer: die Dateien gehören danach automatisch dir
+borg extract REPO::ARCHIV storage/emulated/0/DCIM
+```
+
+In **Vorta**: Einstellungen → „Try to replace file permissions when mounting an archive“ einschalten
+(setzt `-o umask=0277,uid=<eigene ID>`, die Dateien sind dann für dich nur lesbar).
+
 ## Lizenzen
 
 Der Code von AndBorg steht unter der [MIT-Lizenz](LICENSE). Die mitgelieferte Fremdsoftware (borg, Python, OpenSSH …) behält ihre eigenen Lizenzen, siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
