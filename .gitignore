@@ -1,0 +1,14 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+# Laufzeit-Bau (Downloads und entpackte Termux-Pakete); Ergebnis liegt in app/src/main/{assets,jniLibs}
+/runtime/dl/
+/runtime/stage-*/
+/runtime/log-*.txt
