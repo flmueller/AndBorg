@@ -12,3 +12,4 @@
 /runtime/dl/
 /runtime/stage-*/
 /runtime/log-*.txt
+keystore.properties

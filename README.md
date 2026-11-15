@@ -4,6 +4,10 @@
 **borg und ssh sind in der App enthalten**, Termux ist nicht nötig. **Shizuku** ist optional: Damit werden zusätzlich
 `Android/data` und `Android/obb` gesichert.
 
+## Installation
+
+Die APK gibt es unter [Releases](https://github.com/flmueller/AndBorg/releases) (Android 10+, arm64).
+
 ## Einrichtung
 
 Auf der Seite **Status** stehen die Schritte:
@@ -81,6 +85,20 @@ borg extract REPO::ARCHIV storage/emulated/0/DCIM
 
 In **Vorta**: Einstellungen → „Try to replace file permissions when mounting an archive“ einschalten
 (setzt `-o umask=0277,uid=<eigene ID>`, die Dateien sind dann für dich nur lesbar).
+
+## Release bauen
+
+`./gradlew assembleRelease` erzeugt `app/build/outputs/apk/release/app-release.apk` (nur arm64). Signiert wird mit dem
+Schlüssel aus `keystore.properties` im Projektordner (nicht im Repository):
+
+```
+storeFile=/pfad/zu/andborg-release.jks
+storePassword=…
+keyAlias=andborg
+keyPassword=…
+```
+
+Die x86_64-Laufzeit liegt unter `app/src/debug/` und ist nur im Debug-Build (für den Emulator) enthalten.
 
 ## Lizenzen
 

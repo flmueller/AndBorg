@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -15,8 +17,24 @@ android {
         versionName = "0.2.0"
     }
 
+    // Signatur für Release-Builds aus keystore.properties (nicht im Repository)
+    val keystoreProps = Properties().apply {
+        rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+    }
+    signingConfigs {
+        if (keystoreProps.isNotEmpty()) create("release") {
+            storeFile = file(keystoreProps.getProperty("storeFile"))
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
+            // borg ist im Release nur für arm64 enthalten (x86_64 nur im Debug-Build für den Emulator)
+            ndk { abiFilters += "arm64-v8a" }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

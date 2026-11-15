@@ -3,7 +3,8 @@ import os, sys, shutil, subprocess, zipfile, re
 arch, abi = sys.argv[1], sys.argv[2]
 root = os.path.abspath(os.path.dirname(__file__) + "/..")
 usr = f"{root}/stage-{arch}/data/data/com.termux/files/usr"
-app = os.path.abspath(root + "/../app/src/main")
+# arm64 (echte Geräte) in main, x86_64 (nur Emulator) nur im Debug-Build
+app = os.path.abspath(root + "/../app/src/" + ("main" if abi == "arm64-v8a" else "debug"))
 jni = f"{app}/jniLibs/{abi}"
 shutil.rmtree(jni, ignore_errors=True); os.makedirs(jni)
 exes = {"python3.14": "libpython_exec.so", "ssh": "libssh_exec.so", "ssh-keygen": "libsshkeygen_exec.so"}
