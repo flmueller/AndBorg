@@ -110,6 +110,11 @@ fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
                 c.sshOptions, { c = c.copy(sshOptions = it) }, Modifier.fillMaxWidth(), singleLine = true,
                 label = { Text("Zusätzliche ssh-Optionen (optional)") }, placeholder = { Text("-o Compression=no") },
             )
+            SwitchRow(
+                "Post-Quantum-Warnung ignorieren", c.ignorePqWarning,
+                "Blendet die ssh-Warnung „not using a post-quantum key exchange algorithm“ aus, die bei älteren " +
+                    "Servern erscheint. Die Verbindung bleibt verschlüsselt.",
+            ) { c = c.copy(ignorePqWarning = it) }
         }
 
         SectionCard("Was wird gesichert?") {

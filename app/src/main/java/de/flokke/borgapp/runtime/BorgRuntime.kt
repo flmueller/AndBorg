@@ -99,7 +99,8 @@ object BorgRuntime {
             "-o", "ConnectTimeout=20",
             "-o", "ServerAliveInterval=30",
             "-o", "ServerAliveCountMax=6",
-        ).joinToString(" ") + if (cfg.sshOptions.isNotBlank()) " " + cfg.sshOptions.trim() else ""
+        ).let { if (cfg.ignorePqWarning) it + listOf("-o", "WarnWeakCrypto=no-pq-kex") else it }
+            .joinToString(" ") + if (cfg.sshOptions.isNotBlank()) " " + cfg.sshOptions.trim() else ""
     }
 
     fun borgProcess(ctx: Context, cfg: BackupConfig, passphrase: String, args: List<String>): ProcessBuilder {

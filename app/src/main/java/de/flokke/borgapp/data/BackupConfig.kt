@@ -11,6 +11,8 @@ data class BackupConfig(
     val remotePath: String = "",
     /** zusätzliche ssh-Optionen, z. B. "-o Compression=no" */
     val sshOptions: String = "",
+    /** ssh-Warnung „not using a post-quantum key exchange“ ausblenden (ältere Server) */
+    val ignorePqWarning: Boolean = false,
     val sources: List<String> = DEFAULT_SOURCES,
     val excludes: List<String> = DEFAULT_EXCLUDES,
     val compression: String = "lz4",
@@ -54,6 +56,7 @@ data class BackupConfig(
 
     fun toJson(): String = JSONObject().apply {
         put("repo", repo); put("remotePath", remotePath); put("sshOptions", sshOptions)
+        put("ignorePqWarning", ignorePqWarning)
         put("sources", JSONArray(sources)); put("excludes", JSONArray(excludes))
         put("compression", compression); put("archivePrefix", archivePrefix)
         put("extraCreateArgs", extraCreateArgs)
@@ -96,6 +99,7 @@ data class BackupConfig(
                 repo = o.optString("repo", d.repo),
                 remotePath = o.optString("remotePath", d.remotePath),
                 sshOptions = o.optString("sshOptions", d.sshOptions),
+                ignorePqWarning = o.optBoolean("ignorePqWarning", d.ignorePqWarning),
                 sources = list("sources", d.sources),
                 excludes = list("excludes", d.excludes),
                 compression = o.optString("compression", d.compression),
