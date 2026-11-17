@@ -1,7 +1,6 @@
 package de.flokke.borgapp.work
 
 import android.content.Context
-import android.os.Environment
 import de.flokke.borgapp.data.BackupConfig
 import de.flokke.borgapp.data.ConfigStore
 import de.flokke.borgapp.data.HistoryRepo
@@ -56,7 +55,7 @@ object BackupEngine {
             val pass = store.loadPassphrase()
             val problems = cfg.problems() + buildList {
                 if (pass.isEmpty()) add("Keine Passphrase eingetragen")
-                if (!Environment.isExternalStorageManager()) add("Zugriff auf alle Dateien ist nicht erlaubt")
+                if (!de.flokke.borgapp.Compat.hasStorageAccess(ctx)) add("Kein Zugriff auf den Speicher (Berechtigung fehlt)")
             }
             if (problems.isNotEmpty()) {
                 problems.forEach { line("FEHLER: $it") }

@@ -6,13 +6,13 @@
 
 ## Installation
 
-Die APK gibt es unter [Releases](https://github.com/flmueller/AndBorg/releases) (Android 10+, arm64).
+Die APK gibt es unter [Releases](https://github.com/flmueller/AndBorg/releases) (Android 7+, arm64).
 
 ## Einrichtung
 
 Auf der Seite **Status** stehen die Schritte:
 
-1. **Zugriff auf alle Dateien** erlauben.
+1. **Zugriff auf alle Dateien** erlauben (bis Android 10: normale Speicherberechtigung).
 2. **Server und Passphrase** in den Einstellungen eintragen, z. B. `ssh://user@server:22/~/borg/handy`.
    Liegt borg auf dem Server nicht im Standard-PATH (typisch bei NAS-Systemen, Fehler `sh: borg: not found`),
    den Pfad aus `which borg` unter **Remote-Pfad zu borg** eintragen.
@@ -21,6 +21,8 @@ Auf der Seite **Status** stehen die Schritte:
 4. **Verbindung testen**, oder **Neu anlegen** für ein neues Repository (repokey-blake2). Den angezeigten Papier-Schlüssel aufbewahren!
 5. **Akku-Optimierung ausschalten**, damit geplante Backups im Hintergrund als Vordergrunddienst laufen dürfen.
 
+Die Einstellungen werden automatisch gespeichert.
+
 Optional **Shizuku**: Shizuku starten → in AndBorg „Shizuku erlauben“ → in den Einstellungen „Android/data + Android/obb“ einschalten.
 
 ## Ablauf eines Backups
@@ -28,6 +30,16 @@ Optional **Shizuku**: Shizuku starten → in AndBorg „Shizuku erlauben“ → 
 `borg create` (Ordner) → mit Shizuku `tar` (als Shell-Benutzer) | `borg import-tar` → `borg prune` pro Archivtyp → `borg compact`.
 Archive: `<präfix>-files-JJJJ-MM-TT_HH-MM` und `<präfix>-appdata-…`. Läuft über WorkManager als Vordergrunddienst
 (Typ dataSync), manuell oder nach Zeitplan. Ergebnis und Log stehen im Verlauf und in einer Benachrichtigung.
+
+### Zeitplan
+
+- Intervall 6 h, 12 h, täglich, 48 h oder wöchentlich, optional mit **fester Uhrzeit** (z. B. täglich um 02:00;
+  bei 6/12 h im Raster ab dieser Uhrzeit). Bedingungen: nur im WLAN, nur beim Laden, nicht bei niedrigem Akku.
+- Jeder geplante Lauf plant am Ende den nächsten Termin ein, so verschiebt sich die Uhrzeit nicht. Android startet
+  ungefähr zum Termin, im Energiesparmodus oder bei fehlender Bedingung später.
+- **Vorübergehende Fehler** (Server nicht erreichbar, Verbindung abgebrochen, Repository gesperrt) werden
+  wiederholt: nach 30 min, 1 h, 2 h und 4 h. Konfigurationsfehler (falsche Passphrase, Schlüssel abgelehnt) nicht.
+- Wird der Lauf von Android unterbrochen (Neustart, Bedingung fällt weg), holt WorkManager ihn nach.
 
 ## Wie borg in die App kommt
 
@@ -61,10 +73,11 @@ python3 tools/fetch.py x86_64 stage-x86_64 && python3 tools/pack.py x86_64 x86_6
 - `shizuku/`: Shizuku-UserService (AIDL), der `tar` als Shell-Benutzer ausführt
 - `data/`: Konfiguration (DataStore, Passphrase AES-GCM im Android Keystore), Verlauf
 - `ui/`: Status, Einstellungen, Verlauf
+- `Compat.kt`: Unterschiede für Android 7–10 (Speicherberechtigung, Prozess-APIs)
 
 Paketname: `de.flokke.borgapp` (aus der Entwicklungszeit beibehalten, damit bestehende Installationen ihre Einstellungen behalten).
 
-Bauen: `./gradlew assembleDebug` (AGP 9.4, compileSdk 37, minSdk 29, targetSdk 36).
+Bauen: `./gradlew assembleDebug` (AGP 9.4, compileSdk 37, minSdk 24, targetSdk 36).
 
 ## Am PC wiederherstellen
 

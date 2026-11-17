@@ -1,7 +1,6 @@
 package de.flokke.borgapp.ui
 
 import android.app.Application
-import android.os.Environment
 import android.os.PowerManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import java.io.File
@@ -62,6 +62,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch { passphrase.value = store.loadPassphrase() }
+        // Zeitplan nach App-Updates mit aktuellen Einstellungen (z. B. Wiederholungsregeln) neu anwenden;
+        // UPDATE behält den nächsten Termin bei.
+        viewModelScope.launch(Dispatchers.IO) { BackupScheduler.apply(ctx, store.load()) }
         runCatching {
             Shizuku.addRequestPermissionResultListener(shizukuListener)
             Shizuku.addBinderReceivedListenerSticky(binderListener)
@@ -94,20 +97,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshLocal() {
         val pm = ctx.getSystemService(PowerManager::class.java)
         setup.value = setup.value.copy(
-            storage = Environment.isExternalStorageManager(),
+            storage = de.flokke.borgapp.Compat.hasStorageAccess(ctx),
             battery = pm.isIgnoringBatteryOptimizations(ctx.packageName),
             shizuku = ShizukuHelper.state(ctx),
         )
     }
 
-    fun save(cfg: BackupConfig, pass: String) = viewModelScope.launch {
-        store.save(cfg)
-        if (pass != passphrase.value) {
-            store.savePassphrase(pass)
-            passphrase.value = pass
+    private val saveMutex = kotlinx.coroutines.sync.Mutex()
+
+    /** Speichert die Einstellungen (automatisch aus der Einstellungsseite) und übernimmt den Zeitplan. */
+    fun save(cfg: BackupConfig, pass: String) = viewModelScope.launch(Dispatchers.IO) {
+        saveMutex.withLock {
+            if (cfg != config.value) store.save(cfg)
+            if (pass != passphrase.value) {
+                store.savePassphrase(pass)
+                passphrase.value = pass
+            }
+            BackupScheduler.apply(ctx, cfg)
         }
-        BackupScheduler.apply(ctx, cfg)
-        snackbar.value = "Gespeichert" + if (cfg.scheduleEnabled) " – Zeitplan aktiv" else ""
+    }
+
+    fun saveIfChanged(cfg: BackupConfig, pass: String) {
+        if (cfg != config.value || pass != passphrase.value) save(cfg, pass)
     }
 
     private fun borgOp(label: String, title: String, op: suspend (BackupConfig, String) -> BorgResult, onOk: suspend () -> Unit = {}) {

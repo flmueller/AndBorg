@@ -26,7 +26,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,14 +49,34 @@ import de.flokke.borgapp.data.BackupConfig
 fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
     val saved by vm.config.collectAsStateWithLifecycle()
     val savedPass by vm.passphrase.collectAsStateWithLifecycle()
-    // Bearbeitungsstand – wird erst mit "Speichern" übernommen
-    var c by remember(saved) { mutableStateOf(saved) }
-    var pass by remember(savedPass) { mutableStateOf(savedPass) }
+    // Bearbeitungsstand: wird automatisch gespeichert (kurz verzögert, damit nicht bei jedem Tastendruck).
+    // Gespeicherte Werte werden nur übernommen, solange lokal nichts Neueres eingegeben wurde.
+    var c by remember { mutableStateOf(saved) }
+    var cBase by remember { mutableStateOf(saved) }
+    LaunchedEffect(saved) { if (c == cBase) c = saved; cBase = saved }
+    var pass by remember { mutableStateOf(savedPass) }
+    var passBase by remember { mutableStateOf(savedPass) }
+    LaunchedEffect(savedPass) { if (pass == passBase) pass = savedPass; passBase = savedPass }
     var showPass by remember { mutableStateOf(false) }
     var manualPath by remember { mutableStateOf("") }
-    var excludesText by remember(saved) { mutableStateOf(saved.excludes.joinToString("\n")) }
+    var excludesText by remember { mutableStateOf(saved.excludes.joinToString("\n")) }
+    LaunchedEffect(saved.excludes) {
+        val parsed = excludesText.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (parsed != saved.excludes && c.excludes == cBase.excludes) excludesText = saved.excludes.joinToString("\n")
+    }
     LaunchedEffect(excludesText) { c = c.copy(excludes = excludesText.lines().map { it.trim() }.filter { it.isNotEmpty() }) }
-    val dirty = c != saved || pass != savedPass
+
+    val latest by rememberUpdatedState(c to pass)
+    LaunchedEffect(c, pass) {
+        if (c != saved || pass != savedPass) {
+            delay(800)
+            vm.save(c, pass)
+        }
+    }
+    // Beim Verlassen der Seite noch nicht gespeicherte Eingaben sofort sichern
+    DisposableEffect(Unit) {
+        onDispose { val (lc, lp) = latest; vm.saveIfChanged(lc, lp) }
+    }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         uri?.let { treeUriToPath(it) }?.let { p -> if (p !in c.sources) c = c.copy(sources = c.sources + p) }
@@ -63,8 +86,6 @@ fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
         modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        SaveBar(dirty, onSave = { vm.save(c, pass) }, onReset = { c = saved; pass = savedPass; excludesText = saved.excludes.joinToString("\n") })
-
         SectionCard("Repository") {
             OutlinedTextField(
                 c.repo, { c = c.copy(repo = it) }, Modifier.fillMaxWidth(), singleLine = true,
@@ -164,6 +185,19 @@ fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
                             label = { Text(if (h == 168) "wöchentlich" else "$h h") })
                     }
                 }
+                val ctx = androidx.compose.ui.platform.LocalContext.current
+                SwitchRow("Feste Uhrzeit", c.startMinute >= 0) { c = c.copy(startMinute = if (it) 120 else -1) }
+                if (c.startMinute >= 0) {
+                    OutlinedButton(onClick = {
+                        android.app.TimePickerDialog(ctx, { _, h, m -> c = c.copy(startMinute = h * 60 + m) },
+                            c.startMinute / 60, c.startMinute % 60, true).show()
+                    }) { Text("Uhrzeit: %02d:%02d".format(c.startMinute / 60, c.startMinute % 60)) }
+                }
+                Text(
+                    c.scheduleText() + ". Android startet das Backup ungefähr zu diesem Zeitpunkt, " +
+                        "im Energiesparmodus oder wenn eine Bedingung fehlt (WLAN, Laden) auch später.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 SwitchRow("Nur im WLAN (unbegrenztes Netz)", c.requireUnmetered) { c = c.copy(requireUnmetered = it) }
                 SwitchRow("Nur beim Laden", c.requireCharging) { c = c.copy(requireCharging = it) }
                 SwitchRow("Nicht bei niedrigem Akku", c.requireBatteryNotLow) { c = c.copy(requireBatteryNotLow = it) }
@@ -188,18 +222,6 @@ fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
             }
         }
 
-        SaveBar(dirty, onSave = { vm.save(c, pass) }, onReset = { c = saved; pass = savedPass; excludesText = saved.excludes.joinToString("\n") })
-    }
-}
-
-@Composable
-private fun SaveBar(dirty: Boolean, onSave: () -> Unit, onReset: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Button(onClick = onSave, enabled = dirty) { Text("Speichern") }
-        if (dirty) {
-            TextButton(onClick = onReset) { Text("Verwerfen") }
-            Text("Ungespeicherte Änderungen", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
-        }
     }
 }
 

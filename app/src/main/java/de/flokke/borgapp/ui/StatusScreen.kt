@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.flokke.borgapp.Compat
 import de.flokke.borgapp.Notifier
 import de.flokke.borgapp.data.RunStatus
 import de.flokke.borgapp.shizuku.ShizukuState
@@ -65,6 +66,11 @@ fun StatusScreen(vm: MainViewModel, modifier: Modifier, openSettings: () -> Unit
     var confirmInit by remember { mutableStateOf(false) }
 
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.backupNow() }
+    val storagePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        // Dauerhaft abgelehnt: dann bleibt nur die App-Info
+        if (!granted) ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")))
+        vm.refreshLocal()
+    }
     val startBackup = {
         if (Build.VERSION.SDK_INT >= 33) notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.backupNow()
     }
@@ -103,7 +109,7 @@ fun StatusScreen(vm: MainViewModel, modifier: Modifier, openSettings: () -> Unit
                     Text(last.shortSummary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(
-                    if (cfg.scheduleEnabled) "Automatisch alle ${cfg.intervalHours} h" + (nextRun?.let { " · nächstes ab ${fmt(it)}" } ?: "")
+                    if (cfg.scheduleEnabled) "Automatisch: ${cfg.scheduleText()}" + (nextRun?.let { " · nächstes ab ${fmt(it)}" } ?: "")
                     else "Automatisches Backup ist aus (Einstellungen → Zeitplan)",
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -118,9 +124,14 @@ fun StatusScreen(vm: MainViewModel, modifier: Modifier, openSettings: () -> Unit
         SectionCard(if (allDone) "Einrichtung ✓" else "Einrichtung") {
             if (allDone) TextButton(onClick = { showSetup = !setupExpanded }) { Text(if (setupExpanded) "Ausblenden" else "Anzeigen") }
             if (setupExpanded) {
-                Step(1, setup.storage, "Zugriff auf alle Dateien", "Damit borg Fotos, Dokumente usw. lesen kann.") {
+                Step(1, setup.storage, if (Compat.usesAllFilesAccess) "Zugriff auf alle Dateien" else "Zugriff auf den Speicher",
+                    "Damit borg Fotos, Dokumente usw. lesen kann.") {
                     Button(onClick = {
-                        ctx.startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}")))
+                        if (Compat.usesAllFilesAccess) {
+                            @SuppressLint("InlinedApi")
+                            val action = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
+                            ctx.startActivity(Intent(action, Uri.parse("package:${ctx.packageName}")))
+                        } else storagePermission.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
                     }) { Text("Erlauben") }
                 }
                 Step(2, serverOk, "Server und Passphrase eintragen",

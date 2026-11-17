@@ -40,6 +40,29 @@ object Borg {
     }
 
     /** Verständlicher Hinweis zu typischen Fehlermeldungen (oder null). */
+    /**
+     * Vorübergehende Fehler, bei denen sich ein neuer Versuch lohnt: Server/Netz kurz weg,
+     * Verbindung abgebrochen, Repository gerade von einem anderen Rechner gesperrt.
+     */
+    fun isTransient(output: String): Boolean {
+        val o = output.lowercase()
+        // Konfigurationsfehler: erneut versuchen ändert nichts
+        val permanent = listOf(
+            "borg: not found", "borg: command not found", "permission denied (publickey",
+            "host key verification failed", "remote host identification has changed",
+            "passphrase supplied in borg_passphrase", "passphrase is incorrect",
+            "is not a valid repository",
+        )
+        if (permanent.any { it in o }) return false
+        if ("does not exist" in o && "repository" in o) return false
+        return listOf(
+            "connection refused", "could not resolve", "name or service not known", "no address associated",
+            "timed out", "no route to host", "network is unreachable", "connection reset", "connection closed",
+            "broken pipe", "connection lost", "kex_exchange_identification", "closed by remote host",
+            "failed to create/acquire the lock", "lock.exclusive", "lock timeout",
+        ).any { it in o }
+    }
+
     fun explain(output: String): String? {
         val o = output.lowercase()
         return when {

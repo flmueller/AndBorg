@@ -11,10 +11,10 @@ android {
 
     defaultConfig {
         applicationId = "de.flokke.borgapp"
-        minSdk = 29
+        minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 4
+        versionName = "0.3.0"
     }
 
     // Signatur für Release-Builds aus keystore.properties (nicht im Repository)

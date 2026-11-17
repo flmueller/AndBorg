@@ -27,11 +27,25 @@ data class BackupConfig(
     val wakeLock: Boolean = true,
     val scheduleEnabled: Boolean = false,
     val intervalHours: Int = 24,
+    /** Feste Startzeit in Minuten nach Mitternacht, -1 = beliebig */
+    val startMinute: Int = -1,
     val requireUnmetered: Boolean = true,
     val requireCharging: Boolean = false,
     val requireBatteryNotLow: Boolean = true,
 ) {
     val prefix: String get() = sanitizePrefix(archivePrefix)
+
+    /** z. B. „Täglich um 02:00“ oder „Alle 6 h“ */
+    fun scheduleText(): String {
+        val time = if (startMinute >= 0) String.format(java.util.Locale.GERMANY, "%02d:%02d", startMinute / 60, startMinute % 60) else null
+        return when {
+            time == null -> if (intervalHours == 168) "Wöchentlich" else "Alle $intervalHours h"
+            intervalHours == 24 -> "Täglich um $time"
+            intervalHours == 168 -> "Wöchentlich um $time"
+            intervalHours > 24 -> "Alle ${intervalHours / 24} Tage um $time"
+            else -> "Alle $intervalHours h ab $time"
+        }
+    }
 
     fun problems(): List<String> = buildList {
         if (repo.isBlank()) add("Kein Repository angegeben")
@@ -47,6 +61,7 @@ data class BackupConfig(
         put("pruneEnabled", pruneEnabled); put("keepDaily", keepDaily); put("keepWeekly", keepWeekly)
         put("keepMonthly", keepMonthly); put("compact", compact); put("wakeLock", wakeLock)
         put("scheduleEnabled", scheduleEnabled); put("intervalHours", intervalHours)
+        put("startMinute", startMinute)
         put("requireUnmetered", requireUnmetered); put("requireCharging", requireCharging)
         put("requireBatteryNotLow", requireBatteryNotLow)
     }.toString()
@@ -96,6 +111,7 @@ data class BackupConfig(
                 wakeLock = o.optBoolean("wakeLock", d.wakeLock),
                 scheduleEnabled = o.optBoolean("scheduleEnabled", d.scheduleEnabled),
                 intervalHours = o.optInt("intervalHours", d.intervalHours),
+                startMinute = o.optInt("startMinute", d.startMinute),
                 requireUnmetered = o.optBoolean("requireUnmetered", d.requireUnmetered),
                 requireCharging = o.optBoolean("requireCharging", d.requireCharging),
                 requireBatteryNotLow = o.optBoolean("requireBatteryNotLow", d.requireBatteryNotLow),

@@ -10,7 +10,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
-import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
 /**
@@ -37,7 +36,7 @@ object BorgRuntime {
     @Synchronized
     fun ensure(ctx: Context): File {
         val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
-        val stamp = "${pi.longVersionCode}-${pi.lastUpdateTime}"
+        val stamp = "${de.flokke.borgapp.Compat.versionCode(pi)}-${pi.lastUpdateTime}"
         val r = root(ctx)
         val marker = File(r, ".stamp")
         if (marker.exists() && marker.readText() == stamp) return r
@@ -68,7 +67,16 @@ object BorgRuntime {
         val r = root(ctx)
         val tmp = File(ctx.cacheDir, "tmp").apply { mkdirs() }
         home(ctx).mkdirs()
+        // Systemvariablen durchreichen: Ältere libc-Versionen (Android 7) finden ohne ANDROID_ROOT/ANDROID_DATA
+        // die Zeitzonendaten nicht und stürzen in localtime() ab.
+        val sys = listOf("ANDROID_ROOT", "ANDROID_DATA", "ANDROID_RUNTIME_ROOT", "ANDROID_TZDATA_ROOT",
+            "ANDROID_I18N_ROOT", "ANDROID_ART_ROOT", "ANDROID_STORAGE", "EXTERNAL_STORAGE")
+            .mapNotNull { k -> System.getenv(k)?.let { k to it } }
         return mutableMapOf(
+            "ANDROID_ROOT" to "/system",
+            "ANDROID_DATA" to "/data",
+        ).apply { putAll(sys) }.apply { putAll(mapOf(
+            "TZ" to java.util.TimeZone.getDefault().id,
             "HOME" to home(ctx).path,
             "TMPDIR" to tmp.path,
             "LD_LIBRARY_PATH" to "${r.path}/lib",
@@ -76,7 +84,7 @@ object BorgRuntime {
             "SSL_CERT_FILE" to "${r.path}/etc/tls/cert.pem",
             "LANG" to "C.UTF-8",
             "PATH" to "${ctx.applicationInfo.nativeLibraryDir}:/system/bin",
-        )
+        )) }
     }
 
     /** Kommando, mit dem borg ssh aufruft (wird von borg mit shlex zerlegt). */
@@ -200,13 +208,13 @@ object BorgRuntime {
                 }
             }.apply { isDaemon = true; start() }
             try {
-                while (p.isAlive) delay(250)
+                while (de.flokke.borgapp.Compat.isAlive(p)) delay(250)
                 reader.join(5000)
                 p.exitValue()
             } finally {
-                if (p.isAlive) {
+                if (de.flokke.borgapp.Compat.isAlive(p)) {
                     p.destroy() // SIGTERM: borg beendet sich sauber
-                    if (!p.waitFor(20, TimeUnit.SECONDS)) p.destroyForcibly()
+                    if (!de.flokke.borgapp.Compat.waitFor(p, 20_000)) de.flokke.borgapp.Compat.destroyForcibly(p)
                 }
                 feeder?.interrupt()
                 runCatching { stdin?.close() }

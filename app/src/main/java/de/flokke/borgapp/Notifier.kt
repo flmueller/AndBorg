@@ -19,6 +19,7 @@ object Notifier {
     const val ID_PROGRESS = 1002
 
     fun createChannels(ctx: Context) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_STATUS, "Laufendes Backup", NotificationManager.IMPORTANCE_LOW)
@@ -55,22 +56,25 @@ object Notifier {
         return if (i == 0) "$b B" else String.format(java.util.Locale.GERMANY, "%.1f %s", v, units[i])
     }
 
-    fun backupFinished(ctx: Context, r: RunRecord) {
+    fun backupFinished(ctx: Context, r: RunRecord, retryInMinutes: Long? = null) {
         val (title, icon) = when (r.status) {
             RunStatus.OK -> "Backup erfolgreich" to android.R.drawable.stat_sys_upload_done
             RunStatus.WARNING -> "Backup mit Warnungen" to android.R.drawable.stat_sys_warning
             else -> "Backup fehlgeschlagen" to android.R.drawable.stat_notify_error
         }
+        val text = r.shortSummary() + (retryInMinutes?.let { "\nNeuer Versuch in etwa ${formatMinutes(it)}." } ?: "")
         post(
             ctx, NotificationCompat.Builder(ctx, CHANNEL_RESULT)
                 .setSmallIcon(icon)
                 .setContentTitle(title)
-                .setContentText(r.shortSummary())
-                .setStyle(NotificationCompat.BigTextStyle().bigText(r.shortSummary()))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setAutoCancel(true)
                 .setContentIntent(contentIntent(ctx))
         )
     }
+
+    private fun formatMinutes(m: Long) = if (m < 60) "$m Minuten" else if (m == 60L) "1 Stunde" else "${m / 60} Stunden"
 
     fun error(ctx: Context, text: String) = post(
         ctx, NotificationCompat.Builder(ctx, CHANNEL_RESULT)
