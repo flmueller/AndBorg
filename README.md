@@ -16,6 +16,8 @@ Auf der Seite **Status** stehen die Schritte:
 2. **Server und Passphrase** in den Einstellungen eintragen, z. B. `ssh://user@server:22/~/borg/handy`.
    Liegt borg auf dem Server nicht im Standard-PATH (typisch bei NAS-Systemen, Fehler `sh: borg: not found`),
    den Pfad aus `which borg` unter **Remote-Pfad zu borg** eintragen.
+   Meldet ssh „not using a post-quantum key exchange algorithm“ (ältere Server), lässt sich das mit dem Schalter
+   **Post-Quantum-Warnung ignorieren** ausblenden.
 3. Den angezeigten **SSH-Schlüssel** auf dem Server in `~/.ssh/authorized_keys` eintragen
    (empfohlen: `command="borg serve --restrict-to-path …",restrict ssh-ed25519 …`).
 4. **Verbindung testen**, oder **Neu anlegen** für ein neues Repository (repokey-blake2). Den angezeigten Papier-Schlüssel aufbewahren!
