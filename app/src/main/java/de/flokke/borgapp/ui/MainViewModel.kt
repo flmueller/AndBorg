@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import de.flokke.borgapp.R
 import rikka.shizuku.Shizuku
 import java.io.File
 
@@ -42,6 +43,7 @@ data class OutputDialog(val title: String, val text: String, val success: Boolea
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val ctx get() = getApplication<Application>()
     private val store = ConfigStore(app)
+    private fun str(id: Int, vararg args: Any): String = ctx.getString(id, *args)
 
     val config: StateFlow<BackupConfig> = store.config.stateIn(viewModelScope, SharingStarted.Eagerly, BackupConfig())
     val passphrase = MutableStateFlow("")
@@ -82,7 +84,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Entpackt borg (beim ersten Start einige Sekunden) und erzeugt den SSH-Schlüssel. */
     private fun prepareRuntime() = viewModelScope.launch {
-        busy.value = "borg wird vorbereitet"
+        busy.value = str(R.string.busy_preparing)
         try {
             val key = BorgRuntime.ensureKey(ctx)
             val ver = Borg.version(ctx)
@@ -121,56 +123,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (cfg != config.value || pass != passphrase.value) save(cfg, pass)
     }
 
-    private fun borgOp(label: String, title: String, op: suspend (BackupConfig, String) -> BorgResult, onOk: suspend () -> Unit = {}) {
+    private fun borgOp(label: Int, title: Int, op: suspend (BackupConfig, String) -> BorgResult, onOk: suspend () -> Unit = {}) {
         if (busy.value != null) return
         if (BackupEngine.running) {
-            snackbar.value = "Es läuft gerade ein Backup – bitte warten"
+            snackbar.value = str(R.string.backup_running_wait)
             return
         }
         val cfg = config.value
         val pass = passphrase.value
         if (cfg.repo.isBlank() || pass.isEmpty()) {
-            snackbar.value = "Zuerst in den Einstellungen Repository und Passphrase eintragen"
+            snackbar.value = str(R.string.need_repo_pass)
             return
         }
         viewModelScope.launch {
-            busy.value = label
+            busy.value = str(label)
             try {
                 val r = withContext(Dispatchers.IO) { op(cfg, pass) }
                 if (r.ok) onOk()
-                val hint = if (!r.ok) Borg.explain(r.output) else null
+                val hint = if (!r.ok) Borg.explain(ctx, r.output) else null
                 dialog.value = OutputDialog(
-                    title,
-                    (if (hint != null) "$hint\n\n— Ausgabe von borg —\n" else "") + r.output.ifBlank { "(keine Ausgabe, Exit-Code ${r.exitCode})" },
+                    str(title),
+                    (if (hint != null) "$hint\n\n${str(R.string.borg_output_header)}\n" else "") + r.output.ifBlank { str(R.string.no_output_exit, r.exitCode) },
                     r.ok,
                 )
             } catch (e: Exception) {
-                dialog.value = OutputDialog(title, e.message ?: e.toString(), false)
+                dialog.value = OutputDialog(str(title), e.message ?: e.toString(), false)
             } finally {
                 busy.value = null
             }
         }
     }
 
-    fun testRepo() = borgOp("Verbindung wird getestet", "Verbindung testen", { c, p -> Borg.info(ctx, c, p) }) {
+    fun testRepo() = borgOp(R.string.busy_testing, R.string.test_connection, { c, p -> Borg.info(ctx, c, p) }) {
         store.setVerified(config.value.repo)
     }
 
-    fun initRepo() = borgOp("Repository wird angelegt", "Repository anlegen", { c, p -> Borg.init(ctx, c, p) }) {
+    fun initRepo() = borgOp(R.string.busy_init, R.string.title_init, { c, p -> Borg.init(ctx, c, p) }) {
         store.setVerified(config.value.repo)
     }
 
-    fun breakLock() = borgOp("Sperre wird aufgehoben", "Sperre aufheben", { c, p -> Borg.breakLock(ctx, c, p) })
+    fun breakLock() = borgOp(R.string.busy_break, R.string.break_lock, { c, p -> Borg.breakLock(ctx, c, p) })
 
-    fun listArchives() = borgOp("Archive werden geladen", "Archive", { c, p -> Borg.list(ctx, c, p) })
+    fun listArchives() = borgOp(R.string.busy_list, R.string.title_archives, { c, p -> Borg.list(ctx, c, p) })
 
     fun backupNow() {
         if (BackupEngine.running) {
-            snackbar.value = "Es läuft bereits ein Backup"
+            snackbar.value = str(R.string.backup_already_running)
             return
         }
         BackupScheduler.runNow(ctx)
-        snackbar.value = "Backup gestartet"
+        snackbar.value = str(R.string.backup_started)
     }
 
     fun cancelBackup() = viewModelScope.launch(Dispatchers.IO) {
@@ -180,14 +182,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun forgetKnownHosts() {
         File(BorgRuntime.home(ctx), ".ssh/known_hosts").delete()
-        snackbar.value = "Bekannte Server vergessen – beim nächsten Verbinden wird der Host-Schlüssel neu übernommen"
+        snackbar.value = str(R.string.hosts_forgotten)
     }
 
     fun newKey() = viewModelScope.launch {
         BorgRuntime.keyFile(ctx).delete()
         File(BorgRuntime.keyFile(ctx).path + ".pub").delete()
         runCatching { BorgRuntime.ensureKey(ctx) }
-            .onSuccess { setup.value = setup.value.copy(publicKey = it); snackbar.value = "Neuer Schlüssel erzeugt – auf dem Server eintragen" }
+            .onSuccess { setup.value = setup.value.copy(publicKey = it); snackbar.value = str(R.string.key_created) }
             .onFailure { snackbar.value = it.message }
     }
 

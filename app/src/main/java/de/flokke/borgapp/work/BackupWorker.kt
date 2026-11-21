@@ -67,6 +67,7 @@ class BackupWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
     companion object {
         const val KEY_TRIGGER = "trigger"
         const val TRIGGER_SCHEDULED = "geplant"
+        const val TRIGGER_MANUAL = "manuell"
         const val MAX_RETRIES = 4
         const val RETRY_MINUTES = 30L
     }
@@ -172,7 +173,7 @@ object BackupScheduler {
     fun runNow(ctx: Context) {
         val req = OneTimeWorkRequestBuilder<BackupWorker>()
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .setInputData(workDataOf(BackupWorker.KEY_TRIGGER to "manuell"))
+            .setInputData(workDataOf(BackupWorker.KEY_TRIGGER to BackupWorker.TRIGGER_MANUAL))
             .build()
         WorkManager.getInstance(ctx).enqueueUniqueWork(WORK_MANUAL, ExistingWorkPolicy.KEEP, req)
     }

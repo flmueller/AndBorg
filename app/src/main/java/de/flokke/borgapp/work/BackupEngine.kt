@@ -1,6 +1,7 @@
 package de.flokke.borgapp.work
 
 import android.content.Context
+import de.flokke.borgapp.R
 import de.flokke.borgapp.data.BackupConfig
 import de.flokke.borgapp.data.ConfigStore
 import de.flokke.borgapp.data.HistoryRepo
@@ -48,46 +49,47 @@ object BackupEngine {
             if (log.length > 200_000) log.delete(0, log.length - 150_000)
         }
         fun note(rc: Int) { worst = maxOf(worst, classify(rc)) }
+        fun s(id: Int, vararg args: Any): String = ctx.getString(id, *args)
         try {
-            _progress.value = Progress("Vorbereitung")
+            _progress.value = Progress(s(R.string.phase_prepare))
             val store = ConfigStore(ctx)
             val cfg = store.load()
             val pass = store.loadPassphrase()
-            val problems = cfg.problems() + buildList {
-                if (pass.isEmpty()) add("Keine Passphrase eingetragen")
-                if (!de.flokke.borgapp.Compat.hasStorageAccess(ctx)) add("Kein Zugriff auf den Speicher (Berechtigung fehlt)")
+            val problems = cfg.problems(ctx) + buildList {
+                if (pass.isEmpty()) add(s(R.string.err_no_pass))
+                if (!de.flokke.borgapp.Compat.hasStorageAccess(ctx)) add(s(R.string.err_no_storage))
             }
             if (problems.isNotEmpty()) {
-                problems.forEach { line("FEHLER: $it") }
+                problems.forEach { line(s(R.string.log_error, it)) }
                 worst = 2
-                return finish(rec, worst, log)
+                return finish(ctx, rec, worst, log)
             }
             BorgRuntime.ensure(ctx)
             val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.ROOT).format(Date())
 
             // 1) Dateien
             val sources = cfg.sources.filter { File(it).exists() }
-            (cfg.sources - sources.toSet()).forEach { line("Warnung: Ordner existiert nicht, übersprungen: $it"); note(1) }
+            (cfg.sources - sources.toSet()).forEach { line(s(R.string.log_missing_folder, it)); note(1) }
             if (sources.isNotEmpty()) {
-                _progress.value = Progress("Dateien sichern")
-                line("=== Dateien → ${cfg.prefix}-files-$stamp")
+                _progress.value = Progress(s(R.string.phase_files))
+                line(s(R.string.log_files_header, "${cfg.prefix}-files-$stamp"))
                 val args = mutableListOf("create", "--log-json", "--progress", "--stats", "--compression", cfg.compression)
                 (cfg.excludes + ALWAYS_EXCLUDE).forEach { args += listOf("--exclude", it) }
                 args += Borg.splitArgs(cfg.extraCreateArgs)
                 args += "::${cfg.prefix}-files-$stamp"
                 args += sources
-                val rc = borg(ctx, cfg, pass, args, "Dateien sichern", null, ::line)
-                line("borg create: Exit-Code $rc"); note(rc)
+                val rc = borg(ctx, cfg, pass, args, s(R.string.phase_files), null, ::line)
+                line(s(R.string.log_exit, "borg create", rc)); note(rc)
             }
 
             // 2) Android/data + obb über Shizuku
             if (worst < 2 && cfg.includeAppData) {
                 if (ShizukuHelper.state(ctx) != ShizukuState.READY) {
-                    line("Warnung: Shizuku läuft nicht oder ist nicht erlaubt – Android/data und Android/obb übersprungen")
+                    line(s(R.string.log_shizuku_skip))
                     note(1)
                 } else {
-                    _progress.value = Progress("App-Daten sichern")
-                    line("=== App-Daten (Shizuku) → ${cfg.prefix}-appdata-$stamp")
+                    _progress.value = Progress(s(R.string.phase_appdata))
+                    line(s(R.string.log_appdata_header, "${cfg.prefix}-appdata-$stamp"))
                     ShizukuHelper.bind(ctx).use { b ->
                         val tarArgs = buildList {
                             add("-cf"); add("-")
@@ -99,16 +101,16 @@ object BackupEngine {
                             "import-tar", "--log-json", "--progress", "--stats", "--compression", cfg.compression,
                             "::${cfg.prefix}-appdata-$stamp", "-",
                         )
-                        val rc = borg(ctx, cfg, pass, args, "App-Daten sichern",
+                        val rc = borg(ctx, cfg, pass, args, s(R.string.phase_appdata),
                             android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd), ::line)
-                        line("borg import-tar: Exit-Code $rc"); note(rc)
+                        line(s(R.string.log_exit, "borg import-tar", rc)); note(rc)
                         val tar = runCatching { b.service.finishTar() }.getOrElse { "-1\n${it.message}" }
                         val tarRc = tar.substringBefore('\n').trim().toIntOrNull() ?: -1
                         val tarErr = tar.substringAfter('\n', "").lines().filter { it.isNotBlank() }
                         if (tarRc != 0 || tarErr.isNotEmpty()) {
-                            line("Warnung: tar meldete Exit-Code $tarRc (einzelne Dateien nicht lesbar)")
+                            line(s(R.string.log_tar_warn, tarRc))
                             tarErr.take(30).forEach { line("  " + it.removePrefix("tar: ")) }
-                            if (tarErr.size > 30) line("  … ${tarErr.size - 30} weitere")
+                            if (tarErr.size > 30) line("  " + s(R.string.log_more, tarErr.size - 30))
                             note(1)
                         }
                     }
@@ -119,30 +121,30 @@ object BackupEngine {
             if (worst < 2 && cfg.pruneEnabled) {
                 val kinds = listOf("files") + if (cfg.includeAppData) listOf("appdata") else emptyList()
                 for (kind in kinds) {
-                    _progress.value = Progress("Alte Archive ausdünnen")
+                    _progress.value = Progress(s(R.string.phase_prune))
                     line("=== prune ${cfg.prefix}-$kind-*")
                     val rc = borg(ctx, cfg, pass, listOf(
                         "prune", "--log-json", "--list", "--glob-archives", "${cfg.prefix}-$kind-*",
                         "--keep-daily", cfg.keepDaily.toString(), "--keep-weekly", cfg.keepWeekly.toString(),
                         "--keep-monthly", cfg.keepMonthly.toString(),
-                    ), "Alte Archive ausdünnen", null, ::line)
-                    line("borg prune: Exit-Code $rc"); note(rc)
+                    ), s(R.string.phase_prune), null, ::line)
+                    line(s(R.string.log_exit, "borg prune", rc)); note(rc)
                 }
                 if (worst < 2 && cfg.compact) {
-                    _progress.value = Progress("Platz freigeben")
+                    _progress.value = Progress(s(R.string.phase_compact))
                     line("=== compact")
-                    val rc = borg(ctx, cfg, pass, listOf("compact", "--log-json"), "Platz freigeben", null, ::line)
-                    line("borg compact: Exit-Code $rc"); note(rc)
+                    val rc = borg(ctx, cfg, pass, listOf("compact", "--log-json"), s(R.string.phase_compact), null, ::line)
+                    line(s(R.string.log_exit, "borg compact", rc)); note(rc)
                 }
             }
-            return finish(rec, worst, log)
+            return finish(ctx, rec, worst, log)
         } catch (e: CancellationException) {
-            line("Abgebrochen.")
-            withContext(NonCancellable) { finish(rec, 2, log, cancelled = true) }
+            line(s(R.string.log_cancelled))
+            withContext(NonCancellable) { finish(ctx, rec, 2, log, cancelled = true) }
             throw e
         } catch (e: Exception) {
-            line("FEHLER: ${e.message ?: e.javaClass.simpleName}")
-            return finish(rec, 2, log)
+            line(s(R.string.log_error, e.message ?: e.javaClass.simpleName))
+            return finish(ctx, rec, 2, log)
         } finally {
             _progress.value = null
             mutex.unlock()
@@ -162,7 +164,7 @@ object BackupEngine {
         else -> 2
     }
 
-    private fun finish(rec: RunRecord, worst: Int, log: StringBuilder, cancelled: Boolean = false): RunRecord {
+    private fun finish(ctx: Context, rec: RunRecord, worst: Int, log: StringBuilder, cancelled: Boolean = false): RunRecord {
         val status = when {
             cancelled -> RunStatus.ERROR
             worst == 0 -> RunStatus.OK
@@ -170,8 +172,8 @@ object BackupEngine {
             else -> RunStatus.ERROR
         }
         val text = synchronized(log) { log.toString().trimEnd() }
-        val hint = if (status == RunStatus.ERROR) Borg.explain(text) else null
-        return HistoryRepo.finish(rec.id, status, worst, if (hint != null) "Hinweis: $hint\n\n$text" else text)
+        val hint = if (status == RunStatus.ERROR) Borg.explain(ctx, text) else null
+        return HistoryRepo.finish(rec.id, status, worst, if (hint != null) "${ctx.getString(R.string.hint_prefix)} $hint\n\n$text" else text)
     }
 
     /** Führt borg mit --log-json aus, setzt die Fortschrittsanzeige und schreibt Meldungen ins Log. */

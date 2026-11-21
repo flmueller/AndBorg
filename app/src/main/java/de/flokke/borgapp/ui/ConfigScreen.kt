@@ -42,6 +42,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import de.flokke.borgapp.R
 import de.flokke.borgapp.data.BackupConfig
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -82,84 +84,85 @@ fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
         uri?.let { treeUriToPath(it) }?.let { p -> if (p !in c.sources) c = c.copy(sources = c.sources + p) }
     }
 
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        SectionCard("Repository") {
+        SectionCard(stringResource(R.string.repository)) {
             OutlinedTextField(
                 c.repo, { c = c.copy(repo = it) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Repository") },
-                placeholder = { Text("ssh://user@server:22/~/borg/handy") },
-                supportingText = { Text("Borg-1.x-Syntax, z. B. ssh://user@host:port/pfad oder user@host:pfad") },
+                label = { Text(stringResource(R.string.repository)) },
+                placeholder = { Text(stringResource(R.string.repo_placeholder)) },
+                supportingText = { Text(stringResource(R.string.repo_help)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )
             OutlinedTextField(
                 pass, { pass = it }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Passphrase") },
+                label = { Text(stringResource(R.string.passphrase)) },
                 visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = { TextButton(onClick = { showPass = !showPass }) { Text(if (showPass) "Verbergen" else "Zeigen") } },
-                supportingText = { Text("Wird verschlüsselt (Android Keystore) in der App gespeichert") },
+                trailingIcon = { TextButton(onClick = { showPass = !showPass }) { Text(stringResource(if (showPass) R.string.hide_pass else R.string.show_pass)) } },
+                supportingText = { Text(stringResource(R.string.pass_help)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             )
             OutlinedTextField(
                 c.remotePath, { c = c.copy(remotePath = it) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Remote-Pfad zu borg (optional)") }, placeholder = { Text("z. B. borg1 oder /usr/local/bin/borg") },
+                label = { Text(stringResource(R.string.remote_path)) }, placeholder = { Text(stringResource(R.string.remote_path_example)) },
             )
             OutlinedTextField(
                 c.sshOptions, { c = c.copy(sshOptions = it) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Zusätzliche ssh-Optionen (optional)") }, placeholder = { Text("-o Compression=no") },
+                label = { Text(stringResource(R.string.ssh_options)) }, placeholder = { Text("-o Compression=no") },
             )
             SwitchRow(
-                "Post-Quantum-Warnung ignorieren", c.ignorePqWarning,
-                "Blendet die ssh-Warnung „not using a post-quantum key exchange algorithm“ aus, die bei älteren " +
-                    "Servern erscheint. Die Verbindung bleibt verschlüsselt.",
+                stringResource(R.string.pq_ignore), c.ignorePqWarning,
+                stringResource(R.string.pq_ignore_sub),
             ) { c = c.copy(ignorePqWarning = it) }
         }
 
-        SectionCard("Was wird gesichert?") {
+        SectionCard(stringResource(R.string.sec_sources)) {
             c.sources.forEach { src ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(src.removePrefix(BackupConfig.STORAGE).ifEmpty { "/ (gesamter interner Speicher)" }.let { if (src.startsWith(BackupConfig.STORAGE)) "📁 Speicher$it" else "📁 $src" },
+                    val rel = src.removePrefix(BackupConfig.STORAGE).ifEmpty { stringResource(R.string.whole_storage_label) }
+                    Text(if (src.startsWith(BackupConfig.STORAGE)) stringResource(R.string.storage_path, rel) else "📁 $src",
                         Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                    IconButton(onClick = { c = c.copy(sources = c.sources - src) }) { Icon(Icons.Filled.Close, "Entfernen") }
+                    IconButton(onClick = { c = c.copy(sources = c.sources - src) }) { Icon(Icons.Filled.Close, stringResource(R.string.remove)) }
                 }
             }
-            if (c.sources.isEmpty()) Text("Keine Ordner ausgewählt.", color = MaterialTheme.colorScheme.error)
+            if (c.sources.isEmpty()) Text(stringResource(R.string.no_folders), color = MaterialTheme.colorScheme.error)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { folderPicker.launch(null) }) { Text("Ordner hinzufügen") }
+                Button(onClick = { folderPicker.launch(null) }) { Text(stringResource(R.string.add_folder)) }
                 OutlinedButton(onClick = {
                     if (BackupConfig.STORAGE !in c.sources) c = c.copy(sources = c.sources + BackupConfig.STORAGE)
-                }) { Text("Ganzen Speicher") }
+                }) { Text(stringResource(R.string.whole_storage)) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(manualPath, { manualPath = it }, Modifier.weight(1f), singleLine = true, label = { Text("Pfad manuell") })
+                OutlinedTextField(manualPath, { manualPath = it }, Modifier.weight(1f), singleLine = true, label = { Text(stringResource(R.string.manual_path)) })
                 TextButton(onClick = {
                     val p = manualPath.trim().trimEnd('/')
                     if (p.isNotEmpty() && p !in c.sources) c = c.copy(sources = c.sources + p)
                     manualPath = ""
-                }) { Text("Hinzufügen") }
+                }) { Text(stringResource(R.string.add)) }
             }
             OutlinedTextField(
                 excludesText, { excludesText = it }, Modifier.fillMaxWidth(), minLines = 3,
-                label = { Text("Ausschlüsse (ein Muster pro Zeile)") },
-                supportingText = { Text("Borg-Muster, z. B. sh:**/.thumbnails oder sh:/storage/emulated/0/Movies/**") },
+                label = { Text(stringResource(R.string.excludes)) },
+                supportingText = { Text(stringResource(R.string.excludes_help)) },
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             )
             SwitchRow(
-                "Android/data + Android/obb (Shizuku)", c.includeAppData,
-                "Über Shizuku als eigenes Archiv „…-appdata-…“. Läuft Shizuku nicht, wird dieser Teil mit Warnung übersprungen."
+                stringResource(R.string.appdata), c.includeAppData,
+                stringResource(R.string.appdata_sub)
             ) { c = c.copy(includeAppData = it) }
-            if (c.includeAppData) SwitchRow("Cache-Ordner der Apps auslassen", c.appDataSkipCache) { c = c.copy(appDataSkipCache = it) }
+            if (c.includeAppData) SwitchRow(stringResource(R.string.skip_cache), c.appDataSkipCache) { c = c.copy(appDataSkipCache = it) }
         }
 
-        SectionCard("Archiv & Aufräumen") {
+        SectionCard(stringResource(R.string.sec_archive)) {
             OutlinedTextField(
                 c.archivePrefix, { c = c.copy(archivePrefix = it) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Archiv-Präfix") },
-                supportingText = { Text("Archive heißen ${c.prefix}-files-JJJJ-MM-TT_HH-MM") },
+                label = { Text(stringResource(R.string.archive_prefix)) },
+                supportingText = { Text(stringResource(R.string.archive_prefix_help, c.prefix)) },
             )
-            Text("Kompression", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.compression), style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BackupConfig.COMPRESSIONS.forEach { comp ->
                     FilterChip(selected = c.compression == comp, onClick = { c = c.copy(compression = comp) }, label = { Text(comp) })
@@ -167,62 +170,60 @@ fun ConfigScreen(vm: MainViewModel, modifier: Modifier) {
             }
             OutlinedTextField(
                 c.extraCreateArgs, { c = c.copy(extraCreateArgs = it) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Weitere Optionen für borg create (optional)") }, placeholder = { Text("--files-cache=ctime,size") },
+                label = { Text(stringResource(R.string.create_args)) }, placeholder = { Text("--files-cache=ctime,size") },
             )
-            SwitchRow("Alte Archive ausdünnen (prune)", c.pruneEnabled) { c = c.copy(pruneEnabled = it) }
+            SwitchRow(stringResource(R.string.prune), c.pruneEnabled) { c = c.copy(pruneEnabled = it) }
             if (c.pruneEnabled) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField("Täglich", c.keepDaily, Modifier.weight(1f)) { c = c.copy(keepDaily = it) }
-                    NumberField("Wöchentl.", c.keepWeekly, Modifier.weight(1f)) { c = c.copy(keepWeekly = it) }
-                    NumberField("Monatl.", c.keepMonthly, Modifier.weight(1f)) { c = c.copy(keepMonthly = it) }
+                    NumberField(stringResource(R.string.keep_daily), c.keepDaily, Modifier.weight(1f)) { c = c.copy(keepDaily = it) }
+                    NumberField(stringResource(R.string.keep_weekly), c.keepWeekly, Modifier.weight(1f)) { c = c.copy(keepWeekly = it) }
+                    NumberField(stringResource(R.string.keep_monthly), c.keepMonthly, Modifier.weight(1f)) { c = c.copy(keepMonthly = it) }
                 }
-                SwitchRow("Danach Platz freigeben (compact)", c.compact) { c = c.copy(compact = it) }
+                SwitchRow(stringResource(R.string.compact), c.compact) { c = c.copy(compact = it) }
             }
         }
 
-        SectionCard("Zeitplan") {
-            SwitchRow("Automatisch sichern", c.scheduleEnabled) { c = c.copy(scheduleEnabled = it) }
+        SectionCard(stringResource(R.string.sec_schedule)) {
+            SwitchRow(stringResource(R.string.schedule_enabled), c.scheduleEnabled) { c = c.copy(scheduleEnabled = it) }
             if (c.scheduleEnabled) {
-                Text("Intervall", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.interval), style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(6, 12, 24, 48, 168).forEach { h ->
                         FilterChip(selected = c.intervalHours == h, onClick = { c = c.copy(intervalHours = h) },
-                            label = { Text(if (h == 168) "wöchentlich" else "$h h") })
+                            label = { Text(if (h == 168) stringResource(R.string.weekly_chip) else "$h h") })
                     }
                 }
-                val ctx = androidx.compose.ui.platform.LocalContext.current
-                SwitchRow("Feste Uhrzeit", c.startMinute >= 0) { c = c.copy(startMinute = if (it) 120 else -1) }
+                SwitchRow(stringResource(R.string.fixed_time), c.startMinute >= 0) { c = c.copy(startMinute = if (it) 120 else -1) }
                 if (c.startMinute >= 0) {
                     OutlinedButton(onClick = {
                         android.app.TimePickerDialog(ctx, { _, h, m -> c = c.copy(startMinute = h * 60 + m) },
                             c.startMinute / 60, c.startMinute % 60, true).show()
-                    }) { Text("Uhrzeit: %02d:%02d".format(c.startMinute / 60, c.startMinute % 60)) }
+                    }) { Text(stringResource(R.string.time_button, "%02d:%02d".format(c.startMinute / 60, c.startMinute % 60))) }
                 }
                 Text(
-                    c.scheduleText() + ". Android startet das Backup ungefähr zu diesem Zeitpunkt, " +
-                        "im Energiesparmodus oder wenn eine Bedingung fehlt (WLAN, Laden) auch später.",
+                    stringResource(R.string.schedule_hint, c.scheduleText(ctx)),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                SwitchRow("Nur im WLAN (unbegrenztes Netz)", c.requireUnmetered) { c = c.copy(requireUnmetered = it) }
-                SwitchRow("Nur beim Laden", c.requireCharging) { c = c.copy(requireCharging = it) }
-                SwitchRow("Nicht bei niedrigem Akku", c.requireBatteryNotLow) { c = c.copy(requireBatteryNotLow = it) }
+                SwitchRow(stringResource(R.string.req_unmetered), c.requireUnmetered) { c = c.copy(requireUnmetered = it) }
+                SwitchRow(stringResource(R.string.req_charging), c.requireCharging) { c = c.copy(requireCharging = it) }
+                SwitchRow(stringResource(R.string.req_battery), c.requireBatteryNotLow) { c = c.copy(requireBatteryNotLow = it) }
             }
         }
 
-        SectionCard("Werkzeuge") {
+        SectionCard(stringResource(R.string.sec_tools)) {
             var confirmBreak by remember { mutableStateOf(false) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { confirmBreak = true }) { Text("Sperre aufheben") }
-                OutlinedButton(onClick = vm::forgetKnownHosts) { Text("Bekannte Server vergessen") }
-                OutlinedButton(onClick = { vm.newKey() }) { Text("Neuen Schlüssel erzeugen") }
+                OutlinedButton(onClick = { confirmBreak = true }) { Text(stringResource(R.string.break_lock)) }
+                OutlinedButton(onClick = vm::forgetKnownHosts) { Text(stringResource(R.string.forget_hosts)) }
+                OutlinedButton(onClick = { vm.newKey() }) { Text(stringResource(R.string.new_key)) }
             }
             if (confirmBreak) {
                 androidx.compose.material3.AlertDialog(
                     onDismissRequest = { confirmBreak = false },
-                    title = { Text("Sperre aufheben?") },
-                    text = { Text("Führt „borg break-lock“ aus. Nur verwenden, wenn gerade kein anderer Rechner auf dieses Repository sichert.") },
-                    confirmButton = { TextButton(onClick = { confirmBreak = false; vm.breakLock() }) { Text("Aufheben") } },
-                    dismissButton = { TextButton(onClick = { confirmBreak = false }) { Text("Abbrechen") } },
+                    title = { Text(stringResource(R.string.break_lock_confirm_title)) },
+                    text = { Text(stringResource(R.string.break_lock_confirm_text)) },
+                    confirmButton = { TextButton(onClick = { confirmBreak = false; vm.breakLock() }) { Text(stringResource(R.string.break_lock_do)) } },
+                    dismissButton = { TextButton(onClick = { confirmBreak = false }) { Text(stringResource(R.string.cancel)) } },
                 )
             }
         }

@@ -1,6 +1,8 @@
 package de.flokke.borgapp.data
 
+import android.content.Context
 import android.os.Build
+import de.flokke.borgapp.R
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -37,21 +39,21 @@ data class BackupConfig(
 ) {
     val prefix: String get() = sanitizePrefix(archivePrefix)
 
-    /** z. B. „Täglich um 02:00“ oder „Alle 6 h“ */
-    fun scheduleText(): String {
-        val time = if (startMinute >= 0) String.format(java.util.Locale.GERMANY, "%02d:%02d", startMinute / 60, startMinute % 60) else null
+    /** z. B. „Täglich um 02:00“ / „Daily at 02:00“ oder „Alle 6 h“ / „Every 6 h“ */
+    fun scheduleText(ctx: Context): String {
+        val time = if (startMinute >= 0) String.format(java.util.Locale.ROOT, "%02d:%02d", startMinute / 60, startMinute % 60) else null
         return when {
-            time == null -> if (intervalHours == 168) "Wöchentlich" else "Alle $intervalHours h"
-            intervalHours == 24 -> "Täglich um $time"
-            intervalHours == 168 -> "Wöchentlich um $time"
-            intervalHours > 24 -> "Alle ${intervalHours / 24} Tage um $time"
-            else -> "Alle $intervalHours h ab $time"
+            time == null -> if (intervalHours == 168) ctx.getString(R.string.sched_weekly) else ctx.getString(R.string.sched_every_h, intervalHours)
+            intervalHours == 24 -> ctx.getString(R.string.sched_daily_at, time)
+            intervalHours == 168 -> ctx.getString(R.string.sched_weekly_at, time)
+            intervalHours > 24 -> ctx.getString(R.string.sched_days_at, intervalHours / 24, time)
+            else -> ctx.getString(R.string.sched_hours_from, intervalHours, time)
         }
     }
 
-    fun problems(): List<String> = buildList {
-        if (repo.isBlank()) add("Kein Repository angegeben")
-        if (sources.isEmpty() && !includeAppData) add("Keine Ordner zum Sichern ausgewählt")
+    fun problems(ctx: Context): List<String> = buildList {
+        if (repo.isBlank()) add(ctx.getString(R.string.err_no_repo))
+        if (sources.isEmpty() && !includeAppData) add(ctx.getString(R.string.err_no_sources))
     }
 
     fun toJson(): String = JSONObject().apply {

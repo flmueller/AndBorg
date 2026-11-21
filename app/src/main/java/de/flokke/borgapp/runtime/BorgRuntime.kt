@@ -41,7 +41,7 @@ object BorgRuntime {
         val marker = File(r, ".stamp")
         if (marker.exists() && marker.readText() == stamp) return r
         val abi = Build.SUPPORTED_ABIS.firstOrNull { exe(ctx, PY).exists() && assetExists(ctx, "runtime-$it.zip") }
-            ?: error("borg ist für diese Geräte-Architektur nicht enthalten (${Build.SUPPORTED_ABIS.joinToString()})")
+            ?: error(ctx.getString(de.flokke.borgapp.R.string.err_abi, Build.SUPPORTED_ABIS.joinToString()))
         r.deleteRecursively()
         r.mkdirs()
         ZipInputStream(ctx.assets.open("runtime-$abi.zip").buffered()).use { zis ->
@@ -180,7 +180,7 @@ object BorgRuntime {
             pb.redirectErrorStream(true)
             val p = pb.start()
             val out = p.inputStream.bufferedReader().readText()
-            if (p.waitFor() != 0 || !pub.exists()) error("ssh-keygen fehlgeschlagen: $out")
+            if (p.waitFor() != 0 || !pub.exists()) error(ctx.getString(de.flokke.borgapp.R.string.err_keygen, out))
         }
         pub.readText().trim()
     }

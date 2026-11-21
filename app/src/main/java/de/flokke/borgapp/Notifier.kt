@@ -22,10 +22,10 @@ object Notifier {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return
         val nm = ctx.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_STATUS, "Laufendes Backup", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_STATUS, ctx.getString(R.string.ch_running), NotificationManager.IMPORTANCE_LOW)
         )
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_RESULT, "Backup-Ergebnis", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL_RESULT, ctx.getString(R.string.ch_result), NotificationManager.IMPORTANCE_DEFAULT)
         )
     }
 
@@ -36,16 +36,16 @@ object Notifier {
 
     fun progress(ctx: Context, p: Progress?) = NotificationCompat.Builder(ctx, CHANNEL_STATUS)
         .setSmallIcon(android.R.drawable.stat_sys_upload)
-        .setContentTitle("Borg-Backup: ${p?.phase ?: "startet"}")
-        .setContentText(p?.let { progressText(it) } ?: "")
+        .setContentTitle(ctx.getString(R.string.notif_progress_title, p?.phase ?: ctx.getString(R.string.phase_starting)))
+        .setContentText(p?.let { progressText(ctx, it) } ?: "")
         .setProgress(0, 0, true)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setContentIntent(contentIntent(ctx))
         .build()
 
-    fun progressText(p: Progress): String = buildList {
-        if (p.files > 0) add("${p.files} Dateien")
+    fun progressText(ctx: Context, p: Progress): String = buildList {
+        if (p.files > 0) add(ctx.resources.getQuantityString(R.plurals.n_files, p.files.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), p.files))
         if (p.bytes > 0) add(formatBytes(p.bytes))
     }.joinToString(" · ")
 
@@ -53,16 +53,16 @@ object Notifier {
         val units = listOf("B", "kB", "MB", "GB", "TB")
         var v = b.toDouble(); var i = 0
         while (v >= 1000 && i < units.size - 1) { v /= 1000; i++ }
-        return if (i == 0) "$b B" else String.format(java.util.Locale.GERMANY, "%.1f %s", v, units[i])
+        return if (i == 0) "$b B" else String.format(java.util.Locale.getDefault(), "%.1f %s", v, units[i])
     }
 
     fun backupFinished(ctx: Context, r: RunRecord, retryInMinutes: Long? = null) {
         val (title, icon) = when (r.status) {
-            RunStatus.OK -> "Backup erfolgreich" to android.R.drawable.stat_sys_upload_done
-            RunStatus.WARNING -> "Backup mit Warnungen" to android.R.drawable.stat_sys_warning
-            else -> "Backup fehlgeschlagen" to android.R.drawable.stat_notify_error
+            RunStatus.OK -> ctx.getString(R.string.notif_ok) to android.R.drawable.stat_sys_upload_done
+            RunStatus.WARNING -> ctx.getString(R.string.notif_warn) to android.R.drawable.stat_sys_warning
+            else -> ctx.getString(R.string.notif_err) to android.R.drawable.stat_notify_error
         }
-        val text = r.shortSummary() + (retryInMinutes?.let { "\nNeuer Versuch in etwa ${formatMinutes(it)}." } ?: "")
+        val text = r.shortSummary(ctx) + (retryInMinutes?.let { "\n" + ctx.getString(R.string.retry_in, formatMinutes(ctx, it)) } ?: "")
         post(
             ctx, NotificationCompat.Builder(ctx, CHANNEL_RESULT)
                 .setSmallIcon(icon)
@@ -74,12 +74,14 @@ object Notifier {
         )
     }
 
-    private fun formatMinutes(m: Long) = if (m < 60) "$m Minuten" else if (m == 60L) "1 Stunde" else "${m / 60} Stunden"
+    private fun formatMinutes(ctx: Context, m: Long): String =
+        if (m < 60) ctx.resources.getQuantityString(R.plurals.n_minutes, m.toInt(), m.toInt())
+        else ctx.resources.getQuantityString(R.plurals.n_hours, (m / 60).toInt(), (m / 60).toInt())
 
     fun error(ctx: Context, text: String) = post(
         ctx, NotificationCompat.Builder(ctx, CHANNEL_RESULT)
             .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("Backup nicht gestartet")
+            .setContentTitle(ctx.getString(R.string.notif_not_started))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)

@@ -46,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import de.flokke.borgapp.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,10 +80,10 @@ fun BorgTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = scheme, content = content)
 }
 
-private enum class Tab(val title: String, val icon: ImageVector) {
-    STATUS("Status", Icons.Filled.Home),
-    CONFIG("Einstellungen", Icons.Filled.Settings),
-    HISTORY("Verlauf", Icons.AutoMirrored.Filled.List),
+private enum class Tab(val title: Int, val icon: ImageVector) {
+    STATUS(R.string.tab_status, Icons.Filled.Home),
+    CONFIG(R.string.tab_settings, Icons.Filled.Settings),
+    HISTORY(R.string.tab_history, Icons.AutoMirrored.Filled.List),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,7 +102,7 @@ private fun AppRoot(vm: MainViewModel) {
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(title = { Text(if (tab == 0) "AndBorg" else Tab.entries[tab].title) })
+                TopAppBar(title = { Text(stringResource(if (tab == 0) R.string.app_name else Tab.entries[tab].title)) })
                 if (busy != null) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     Text(
@@ -115,7 +117,7 @@ private fun AppRoot(vm: MainViewModel) {
                 Tab.entries.forEachIndexed { i, t ->
                     NavigationBarItem(
                         selected = tab == i, onClick = { tab = i },
-                        icon = { Icon(t.icon, contentDescription = null) }, label = { Text(t.title) }
+                        icon = { Icon(t.icon, contentDescription = null) }, label = { Text(stringResource(t.title)) }
                     )
                 }
             }
@@ -144,8 +146,8 @@ private fun AppRoot(vm: MainViewModel) {
                     Text(d.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 15.sp)
                 }
             },
-            confirmButton = { TextButton(onClick = vm::dismissDialog) { Text("OK") } },
-            dismissButton = { TextButton(onClick = { clipboard(d.title, d.text) }) { Text("Kopieren") } },
+            confirmButton = { TextButton(onClick = vm::dismissDialog) { Text(stringResource(R.string.ok)) } },
+            dismissButton = { TextButton(onClick = { clipboard(d.title, d.text) }) { Text(stringResource(R.string.copy)) } },
         )
     }
 }

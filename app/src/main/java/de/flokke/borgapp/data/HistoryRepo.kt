@@ -1,6 +1,7 @@
 package de.flokke.borgapp.data
 
 import android.content.Context
+import de.flokke.borgapp.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
@@ -18,26 +19,27 @@ data class RunRecord(
     val output: String = "",
 ) {
     /** Kurzer Text für Benachrichtigung und Liste */
-    fun shortSummary(): String {
+    fun shortSummary(ctx: Context): String {
         // Nur die Zusammenfassung oben, nicht den angehängten Log-Auszug (sonst doppelt gezählt)
         val all = output.lines()
         val lines = all.takeWhile { !it.startsWith("--- Log") }.ifEmpty { all }
         fun find(prefix: String) = lines.firstOrNull { it.trimStart().startsWith(prefix) }?.trim()
         return when (status) {
-            RunStatus.RUNNING -> "Läuft …"
+            RunStatus.RUNNING -> ctx.getString(R.string.sum_running)
             RunStatus.OK, RunStatus.WARNING -> listOfNotNull(
-                find("Duration:")?.replace("Duration:", "Dauer:"),
+                find("Duration:")?.let { ctx.getString(R.string.sum_duration, it.removePrefix("Duration:").trim()) },
                 lines.filter { it.trimStart().startsWith("Number of files:") }
                     .sumOf { it.substringAfter(":").trim().toLongOrNull() ?: 0 }
-                    .takeIf { it > 0 }?.let { "Dateien: $it" },
+                    .takeIf { it > 0 }?.let { ctx.getString(R.string.sum_files, it) },
                 lines.filter { it.trimStart().startsWith("This archive:") }.mapNotNull { sizes(it) }
                     .takeIf { it.isNotEmpty() }
-                    ?.joinToString(" + ") { (orig, dedup) -> "$orig gesichert, davon neu: $dedup" },
-                if (status == RunStatus.WARNING) "Warnungen – Details im Verlauf" else null,
-            ).joinToString("\n").ifBlank { "Exit-Code ${exitCode ?: "?"}" }
-            RunStatus.ERROR -> all.firstOrNull { it.startsWith("Hinweis: ") }?.removePrefix("Hinweis: ") ?: (all.firstOrNull { l -> !l.contains("terminating") && ERROR_HINTS.any { l.contains(it, true) } }
+                    ?.joinToString(" + ") { (orig, dedup) -> ctx.getString(R.string.sum_sizes, orig, dedup) },
+                if (status == RunStatus.WARNING) ctx.getString(R.string.sum_warnings) else null,
+            ).joinToString("\n").ifBlank { ctx.getString(R.string.exit_code, exitCode?.toString() ?: "?") }
+            // Hinweiszeile in beliebiger App-Sprache erkennen (ältere Einträge sind deutsch)
+            RunStatus.ERROR -> all.firstNotNullOfOrNull { l -> HINT_PREFIXES.firstOrNull { l.startsWith(it) }?.let { l.removePrefix(it).trim() } } ?: (all.firstOrNull { l -> !l.contains("terminating") && ERROR_HINTS.any { l.contains(it, true) } }
                 ?: all.lastOrNull { it.contains("terminating") })
-                ?.trim()?.removePrefix("Remote: ") ?: "Exit-Code ${exitCode ?: "?"}"
+                ?.trim()?.removePrefix("Remote: ") ?: ctx.getString(R.string.exit_code, exitCode?.toString() ?: "?")
         }
     }
 
@@ -53,6 +55,7 @@ data class RunRecord(
     }
 
     companion object {
+        private val HINT_PREFIXES = listOf("Hinweis:", "Note:")
         private val ERROR_HINTS = listOf(
             "error", "fehler", "refused", "denied", "failed", "not found", "timed out", "does not exist",
             "Could not resolve", "No route", "passphrase", "Is borg working",
@@ -83,7 +86,7 @@ object HistoryRepo {
             (0 until a.length()).map { RunRecord.fromJson(a.getJSONObject(it)) }
         }.getOrDefault(emptyList()).map {
             // Prozess wurde während eines Laufs beendet
-            if (it.status == RunStatus.RUNNING) it.copy(status = RunStatus.ERROR, output = it.output + "\nUnterbrochen (App wurde beendet).") else it
+            if (it.status == RunStatus.RUNNING) it.copy(status = RunStatus.ERROR, output = it.output + "\n" + ctx.getString(R.string.interrupted)) else it
         }
     }
 

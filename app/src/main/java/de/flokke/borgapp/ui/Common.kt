@@ -59,7 +59,7 @@ fun rememberCopy(): (String, String) -> Unit {
 
 fun copyToClipboard(ctx: Context, label: String, text: String) {
     ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(ctx, "Kopiert", Toast.LENGTH_SHORT).show()
+    Toast.makeText(ctx, de.flokke.borgapp.R.string.copied, Toast.LENGTH_SHORT).show()
 }
 
 fun shareText(ctx: Context, title: String, text: String) {

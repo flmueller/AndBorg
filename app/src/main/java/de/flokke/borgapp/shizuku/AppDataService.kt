@@ -43,7 +43,7 @@ class AppDataService : IAppDataService.Stub() {
     }
 
     override fun finishTar(): String {
-        val p = proc ?: return "-1\nkein tar-Prozess"
+        val p = proc ?: return "-1\nno tar process"
         pump?.join()
         val rc = p.waitFor()
         Thread.sleep(200)

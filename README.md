@@ -4,6 +4,9 @@
 **borg und ssh sind in der App enthalten**, Termux ist nicht nötig. **Shizuku** ist optional: Damit werden zusätzlich
 `Android/data` und `Android/obb` gesichert.
 
+Die App gibt es auf **Deutsch und Englisch**. Sie richtet sich nach der Gerätesprache, ab Android 13 lässt sich die
+Sprache in den Android-Einstellungen auch nur für AndBorg umstellen.
+
 ## Installation
 
 Die APK gibt es unter [Releases](https://github.com/flmueller/AndBorg/releases) (Android 7+, arm64).
@@ -75,6 +78,7 @@ python3 tools/fetch.py x86_64 stage-x86_64 && python3 tools/pack.py x86_64 x86_6
 - `shizuku/`: Shizuku-UserService (AIDL), der `tar` als Shell-Benutzer ausführt
 - `data/`: Konfiguration (DataStore, Passphrase AES-GCM im Android Keystore), Verlauf
 - `ui/`: Status, Einstellungen, Verlauf
+- `res/values/strings.xml` (Englisch, Standard) und `res/values-de/strings.xml` (Deutsch): alle Texte der App
 - `Compat.kt`: Unterschiede für Android 7–10 (Speicherberechtigung, Prozess-APIs)
 
 Paketname: `de.flokke.borgapp` (aus der Entwicklungszeit beibehalten, damit bestehende Installationen ihre Einstellungen behalten).

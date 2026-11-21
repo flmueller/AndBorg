@@ -36,6 +36,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import de.flokke.borgapp.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,101 +88,107 @@ fun StatusScreen(vm: MainViewModel, modifier: Modifier, openSettings: () -> Unit
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         setup.runtimeError?.let {
-            SectionCard("borg konnte nicht gestartet werden") { Text(it, color = MaterialTheme.colorScheme.error) }
+            SectionCard(stringResource(R.string.runtime_error_title)) { Text(it, color = MaterialTheme.colorScheme.error) }
         }
 
         // ---- Backup ----
-        SectionCard("Backup") {
+        SectionCard(stringResource(R.string.backup)) {
             val p = progress
             if (p != null) {
                 Text(p.phase + " …", style = MaterialTheme.typography.bodyLarge)
                 LinearProgressIndicator(Modifier.fillMaxWidth())
-                Notifier.progressText(p).takeIf { it.isNotEmpty() }?.let { Text(it) }
+                Notifier.progressText(ctx, p).takeIf { it.isNotEmpty() }?.let { Text(it) }
                 if (p.path.isNotBlank()) Text(p.path, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = { vm.cancelBackup() }) { Text("Abbrechen") }
+                OutlinedButton(onClick = { vm.cancelBackup() }) { Text(stringResource(R.string.cancel)) }
             } else {
                 val last = runs.firstOrNull()
-                if (last == null) Text("Noch kein Backup gemacht.")
+                if (last == null) Text(stringResource(R.string.no_backup_yet))
                 else {
                     val icon = when (last.status) { RunStatus.OK -> "✅"; RunStatus.WARNING -> "⚠️"; RunStatus.ERROR -> "❌"; RunStatus.RUNNING -> "⏳" }
-                    Text("$icon Letztes Backup: ${fmt(last.id)}", style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.clickable { vm.showText("Backup ${fmt(last.id)}", last.output) })
-                    Text(last.shortSummary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val title = stringResource(R.string.backup_title, fmt(last.id))
+                    Text(stringResource(R.string.last_backup, icon, fmt(last.id)), style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.clickable { vm.showText(title, last.output) })
+                    Text(last.shortSummary(ctx), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(
-                    if (cfg.scheduleEnabled) "Automatisch: ${cfg.scheduleText()}" + (nextRun?.let { " · nächstes ab ${fmt(it)}" } ?: "")
-                    else "Automatisches Backup ist aus (Einstellungen → Zeitplan)",
+                    when {
+                        !cfg.scheduleEnabled -> stringResource(R.string.schedule_off)
+                        nextRun != null -> stringResource(R.string.schedule_auto_next, cfg.scheduleText(ctx), fmt(nextRun!!))
+                        else -> stringResource(R.string.schedule_auto, cfg.scheduleText(ctx))
+                    },
                     style = MaterialTheme.typography.bodySmall,
                 )
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = startBackup, enabled = serverOk && setup.storage && setup.runtimeError == null) { Text("Jetzt sichern") }
-                    OutlinedButton(onClick = vm::listArchives, enabled = serverOk && busy == null) { Text("Archive anzeigen") }
+                    Button(onClick = startBackup, enabled = serverOk && setup.storage && setup.runtimeError == null) { Text(stringResource(R.string.backup_now)) }
+                    OutlinedButton(onClick = vm::listArchives, enabled = serverOk && busy == null) { Text(stringResource(R.string.show_archives)) }
                 }
             }
         }
 
         // ---- Einrichtung ----
-        SectionCard(if (allDone) "Einrichtung ✓" else "Einrichtung") {
-            if (allDone) TextButton(onClick = { showSetup = !setupExpanded }) { Text(if (setupExpanded) "Ausblenden" else "Anzeigen") }
+        SectionCard(stringResource(if (allDone) R.string.setup_done else R.string.setup)) {
+            if (allDone) TextButton(onClick = { showSetup = !setupExpanded }) { Text(stringResource(if (setupExpanded) R.string.hide else R.string.show)) }
             if (setupExpanded) {
-                Step(1, setup.storage, if (Compat.usesAllFilesAccess) "Zugriff auf alle Dateien" else "Zugriff auf den Speicher",
-                    "Damit borg Fotos, Dokumente usw. lesen kann.") {
+                Step(1, setup.storage, stringResource(if (Compat.usesAllFilesAccess) R.string.step_storage_all else R.string.step_storage),
+                    stringResource(R.string.step_storage_sub)) {
                     Button(onClick = {
                         if (Compat.usesAllFilesAccess) {
                             @SuppressLint("InlinedApi")
                             val action = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
                             ctx.startActivity(Intent(action, Uri.parse("package:${ctx.packageName}")))
                         } else storagePermission.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-                    }) { Text("Erlauben") }
+                    }) { Text(stringResource(R.string.allow)) }
                 }
-                Step(2, serverOk, "Server und Passphrase eintragen",
-                    if (serverOk) cfg.repo else "z. B. ssh://user@server:22/~/borg/handy") {
-                    OutlinedButton(onClick = openSettings) { Text(if (serverOk) "Ändern" else "Eintragen") }
+                Step(2, serverOk, stringResource(R.string.step_server),
+                    if (serverOk) cfg.repo else stringResource(R.string.repo_example)) {
+                    OutlinedButton(onClick = openSettings) { Text(stringResource(if (serverOk) R.string.change else R.string.enter)) }
                 }
-                Step(3, connOk, "SSH-Schlüssel auf dem Server eintragen",
-                    "Diese Zeile auf dem Server in ~/.ssh/authorized_keys einfügen:", alwaysShowActions = true) {
+                Step(3, connOk, stringResource(R.string.step_key),
+                    stringResource(R.string.step_key_sub), alwaysShowActions = true) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         SelectionContainer {
-                            Text(setup.publicKey.ifEmpty { "(wird erzeugt …)" }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp)
+                            Text(setup.publicKey.ifEmpty { stringResource(R.string.key_generating) }, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 14.sp)
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { copy("SSH-Schlüssel", setup.publicKey) }, enabled = setup.publicKey.isNotEmpty()) { Text("Kopieren") }
-                            OutlinedButton(onClick = { shareText(ctx, "SSH-Schlüssel AndBorg", setup.publicKey) }, enabled = setup.publicKey.isNotEmpty()) { Text("Teilen") }
+                            val keyLabel = stringResource(R.string.ssh_key)
+                            val shareTitle = stringResource(R.string.ssh_key_share_title)
+                            OutlinedButton(onClick = { copy(keyLabel, setup.publicKey) }, enabled = setup.publicKey.isNotEmpty()) { Text(stringResource(R.string.copy)) }
+                            OutlinedButton(onClick = { shareText(ctx, shareTitle, setup.publicKey) }, enabled = setup.publicKey.isNotEmpty()) { Text(stringResource(R.string.share)) }
                         }
                     }
                 }
-                Step(4, connOk, "Verbindung prüfen", "Testet Server, Schlüssel und Passphrase. Gibt es noch kein Repository: „Neu anlegen“.",
+                Step(4, connOk, stringResource(R.string.step_test), stringResource(R.string.step_test_sub),
                     alwaysShowActions = true) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = vm::testRepo, enabled = serverOk && busy == null) { Text("Verbindung testen") }
-                        OutlinedButton(onClick = { confirmInit = true }, enabled = serverOk && busy == null) { Text("Neu anlegen") }
+                        Button(onClick = vm::testRepo, enabled = serverOk && busy == null) { Text(stringResource(R.string.test_connection)) }
+                        OutlinedButton(onClick = { confirmInit = true }, enabled = serverOk && busy == null) { Text(stringResource(R.string.create_new)) }
                     }
                 }
-                Step(5, setup.battery, "Akku-Optimierung ausschalten", "Nötig, damit geplante Backups im Hintergrund durchlaufen.") {
+                Step(5, setup.battery, stringResource(R.string.step_battery), stringResource(R.string.step_battery_sub)) {
                     Button(onClick = {
                         ctx.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}")))
-                    }) { Text("Erlauben") }
+                    }) { Text(stringResource(R.string.allow)) }
                 }
             }
         }
 
         // ---- Shizuku ----
-        SectionCard("Shizuku (optional)") {
+        SectionCard(stringResource(R.string.shizuku_title)) {
             Text(
-                "Mit Shizuku werden zusätzlich Android/data und Android/obb gesichert (Einstellungen → „Android/data + Android/obb“).",
+                stringResource(R.string.shizuku_info),
                 style = MaterialTheme.typography.bodySmall,
             )
             when (setup.shizuku) {
-                ShizukuState.NOT_INSTALLED -> Text("Shizuku ist nicht installiert.")
-                ShizukuState.NOT_RUNNING -> Text("Shizuku ist installiert, läuft aber nicht. Shizuku öffnen und starten.")
-                ShizukuState.NO_PERMISSION -> Row { Button(onClick = vm::requestShizuku) { Text("Shizuku erlauben") } }
-                ShizukuState.READY -> Text("✅ Shizuku ist bereit" + if (!cfg.includeAppData) " – in den Einstellungen einschalten." else ".")
+                ShizukuState.NOT_INSTALLED -> Text(stringResource(R.string.shizuku_not_installed))
+                ShizukuState.NOT_RUNNING -> Text(stringResource(R.string.shizuku_not_running))
+                ShizukuState.NO_PERMISSION -> Row { Button(onClick = vm::requestShizuku) { Text(stringResource(R.string.shizuku_allow)) } }
+                ShizukuState.READY -> Text(stringResource(if (!cfg.includeAppData) R.string.shizuku_ready_enable else R.string.shizuku_ready))
             }
         }
 
         if (setup.borgVersion.isNotEmpty()) {
-            Text("${setup.borgVersion} (in der App enthalten)", style = MaterialTheme.typography.labelSmall,
+            Text(stringResource(R.string.borg_version_bundled, setup.borgVersion), style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -188,13 +196,12 @@ fun StatusScreen(vm: MainViewModel, modifier: Modifier, openSettings: () -> Unit
     if (confirmInit) {
         AlertDialog(
             onDismissRequest = { confirmInit = false },
-            title = { Text("Neues Repository anlegen?") },
+            title = { Text(stringResource(R.string.init_confirm_title)) },
             text = {
-                Text("Unter\n${cfg.repo}\nwird ein neues, verschlüsseltes Repository (repokey-blake2) mit der eingetragenen Passphrase angelegt. " +
-                    "Fehlende Ordner werden erstellt. Danach wird der Schlüssel zum Aufbewahren angezeigt.")
+                Text(stringResource(R.string.init_confirm_text, cfg.repo))
             },
-            confirmButton = { TextButton(onClick = { confirmInit = false; vm.initRepo() }) { Text("Anlegen") } },
-            dismissButton = { TextButton(onClick = { confirmInit = false }) { Text("Abbrechen") } },
+            confirmButton = { TextButton(onClick = { confirmInit = false; vm.initRepo() }) { Text(stringResource(R.string.create)) } },
+            dismissButton = { TextButton(onClick = { confirmInit = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }
@@ -215,4 +222,8 @@ private fun Step(
     }
 }
 
-fun fmt(t: Long): String = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY).format(Date(t))
+/** Datum und Uhrzeit im Format der Gerätesprache (z. B. 21.11.2026, 02:00 oder 11/21/2026, 02:00). */
+fun fmt(t: Long): String {
+    val pattern = android.text.format.DateFormat.getBestDateTimePattern(Locale.getDefault(), "ddMMyyyyHHmm")
+    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(t))
+}
