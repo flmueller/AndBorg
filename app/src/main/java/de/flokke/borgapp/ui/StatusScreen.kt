@@ -187,10 +187,14 @@ fun StatusScreen(vm: MainViewModel, modifier: Modifier, openSettings: () -> Unit
             }
         }
 
-        if (setup.borgVersion.isNotEmpty()) {
-            Text(stringResource(R.string.borg_version_bundled, setup.borgVersion), style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val appVersion = remember {
+            runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
         }
+        Text(
+            "AndBorg $appVersion" + if (setup.borgVersion.isNotEmpty()) " · " + stringResource(R.string.borg_version_bundled, setup.borgVersion) else "",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     if (confirmInit) {
